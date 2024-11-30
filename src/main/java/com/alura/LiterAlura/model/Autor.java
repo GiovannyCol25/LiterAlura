@@ -16,6 +16,7 @@ public class Autor {
     @OneToMany(mappedBy = "autores", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<Libros> libros;
 
+
     public Autor(){}
     public Autor(DatosAutor datosAutor) {
         this.nombre = datosAutor.nombre();
