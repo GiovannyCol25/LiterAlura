@@ -36,6 +36,9 @@ public class Principal {
                 3 - Listar autores registrados
                 4 - Listar autores vivos en un determinado año
                 5 - Listar libros por idiomas
+                6 - Top los 10 libros más decargados
+                7 - Buscar autor por su nombre
+                8 - Estadisticas
                 0 - Salir
                 """;
             System.out.println(menu);
@@ -61,6 +64,15 @@ public class Principal {
                     case 5:
                         listarLibrosPorIdiomas();
                         break;
+                    case 6:
+                        topMasDescargados();
+                        break;
+                    case 7:
+                        buscarAutorPorNombre();
+                        break;
+                    case 8:
+                        obtenerEstadisticas();
+                        break;
                     case 0:
                         System.out.println("Saliendo del sistema. ¡Hasta luego!");
                         break;
@@ -85,9 +97,9 @@ public class Principal {
                 .filter(l -> l.titulo().toUpperCase().contains(nombreLibro.toUpperCase()))
                 .map(datosLibros -> {
                     Autor autor = autorRepository.findByNombre(datosLibros.autores().get(0).nombre())
-                            .orElse(new Autor(datosLibros.autores().get(0))); // Busca si el autor ya existe
+                            .orElse(new Autor(datosLibros.autores().get(0)));
                     Libros libro = new Libros(datosLibros);
-                    libro.setAutores(autor); // Relaciona el libro con el autor (nuevo o existente)
+                    libro.setAutores(autor);
                     return libro;
                 })
                 .findFirst();
@@ -181,6 +193,52 @@ public class Principal {
             aniosFiltrados.forEach(autor -> System.out.println("- " + autor.getNombre()));
         }
     }
-}
-    
 
+    private void topMasDescargados(){
+        System.out.println("Los 10 libros más decargados son: ");
+        var json = consumoAPI.obtenerDatos(URL_BASE);
+        var datos = conversor.obtenerDatos(json, Datos.class);
+        datos.resultados().stream()
+                .sorted(Comparator.comparing(DatosLibros::numeroDeDescargas).reversed())
+                .limit(10)
+                .map(l -> l.titulo().toUpperCase())
+                .forEach(System.out::println);
+    }
+
+    private void buscarAutorPorNombre() {
+        System.out.println("Digite el nombre del autor a consultar: ");
+        var consultaAutor = teclado.nextLine();
+        var json = consumoAPI.obtenerDatos(URL_BASE + "?search=" + consultaAutor.replace(" ", "+"));
+
+        if (json.isEmpty()) {
+            System.out.println("No se encontraron autores con el nombre indicado.");
+            return;
+        }
+
+        var datos = conversor.obtenerDatos(json, Datos.class);
+        var autorEncontrado = datos.resultados().stream()
+                .flatMap(d -> d.autores().stream())
+                .findFirst();
+
+        if (autorEncontrado.isPresent()) {
+            System.out.println("Autor encontrado: " + autorEncontrado.get());
+        } else {
+            System.out.println("No se encontraron autores con el nombre indicado.");
+        }
+    }
+
+    private void obtenerEstadisticas(){
+        var json = consumoAPI.obtenerDatos(URL_BASE);
+        var datos = conversor.obtenerDatos(json, Datos.class);
+        IntSummaryStatistics estadisticas = datos.resultados().stream()
+                .filter(libro -> libro.numeroDeDescargas()>0)
+                .mapToInt(DatosLibros::numeroDeDescargas)
+                .summaryStatistics();
+
+        System.out.println("Estadísticas de descargas:");
+        System.out.println("Media de descargas: " + estadisticas.getAverage());
+        System.out.println("Máximo de descargas: " + estadisticas.getMax());
+        System.out.println("Mínimo de descargas: " + estadisticas.getMin());
+        System.out.println("Número total de libros con descargas: " + estadisticas.getCount());
+    }
+}
